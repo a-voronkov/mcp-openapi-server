@@ -260,6 +260,7 @@ Filters are applied in a specific order with different precedence:
 2. **`includeOperations`**: Filter by HTTP methods (AND operation with remaining filters)
 3. **`includeResources`**: Filter by resource names (AND operation)
 4. **`includeTags`**: Filter by OpenAPI tags (AND operation)
+5. **`excludeTags`**: Exclude tools with specified tags (highest priority exclusion)
 
 ### Filter Modes
 

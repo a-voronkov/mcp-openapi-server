@@ -3,6 +3,7 @@ import { ToolsManager } from "../src/tools-manager"
 import { OpenAPISpecLoader, ExtendedTool } from "../src/openapi-loader"
 import { Tool } from "@modelcontextprotocol/sdk/types.js"
 import { parseToolId as parseToolIdUtil } from "../src/utils/tool-id.js"
+import { OpenAPIMCPServerConfig } from "../src/config.js"
 
 // Mock dependencies
 vi.mock("../src/openapi-loader", () => {
@@ -957,6 +958,83 @@ describe("ToolsManager", () => {
         method: "GET",
         path: "/api/v1/users/id/profile",
       })
+    })
+  })
+
+  describe("filtering", () => {
+    it("should filter tools by includeTags", async () => {
+      const config: OpenAPIMCPServerConfig = {
+        name: "test",
+        version: "1.0.0",
+        apiBaseUrl: "https://api.example.com",
+        openApiSpec: "test",
+        specInputMethod: "inline",
+        inlineSpecContent: JSON.stringify({
+          openapi: "3.0.0",
+          paths: {
+            "/users": {
+              get: {
+                tags: ["user"],
+                summary: "Get users",
+              },
+            },
+            "/admin": {
+              get: {
+                tags: ["admin"],
+                summary: "Get admin",
+              },
+            },
+          },
+        }),
+        transportType: "stdio",
+        toolsMode: "all",
+        includeTags: ["user"],
+      }
+
+      const toolsManager = new ToolsManager(config)
+      await toolsManager.initialize()
+
+      const tools = toolsManager.getAllTools()
+      expect(tools).toHaveLength(1)
+      expect(tools[0].name).toBe("getUsers")
+    })
+
+    it("should exclude tools by excludeTags", async () => {
+      const config: OpenAPIMCPServerConfig = {
+        name: "test",
+        version: "1.0.0",
+        apiBaseUrl: "https://api.example.com",
+        openApiSpec: "test",
+        specInputMethod: "inline",
+        inlineSpecContent: JSON.stringify({
+          openapi: "3.0.0",
+          paths: {
+            "/users": {
+              get: {
+                tags: ["user"],
+                summary: "Get users",
+              },
+            },
+            "/files": {
+              post: {
+                tags: ["file-operations"],
+                summary: "Upload file",
+              },
+            },
+          },
+        }),
+        transportType: "stdio",
+        toolsMode: "all",
+        excludeTags: ["file-operations"],
+      }
+
+      const toolsManager = new ToolsManager(config)
+      await toolsManager.initialize()
+
+      const tools = toolsManager.getAllTools()
+      expect(tools).toHaveLength(1)
+      expect(tools[0].name).toBe("getUsers")
+      expect(tools[0].description).toContain("GET request to /users")
     })
   })
 })

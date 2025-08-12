@@ -199,6 +199,18 @@ export class ToolsManager {
         }
       }
 
+      // excludeTags filter
+      if (this.config.excludeTags && this.config.excludeTags.length > 0) {
+        const excludeTagsLower = this.config.excludeTags.map((tag) => tag.toLowerCase())
+        const toolTags = Array.isArray(extendedTool.tags) ? extendedTool.tags : []
+        const hasExcludedTag = toolTags.some(
+          (tag) => typeof tag === "string" && excludeTagsLower.includes(tag.toLowerCase()),
+        )
+        if (hasExcludedTag) {
+          continue
+        }
+      }
+
       filtered.set(toolId, tool)
     }
     this.tools = filtered

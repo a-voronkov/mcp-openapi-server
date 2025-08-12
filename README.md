@@ -254,6 +254,7 @@ Based on the Stainless article "What We Learned Converting Complex OpenAPI Specs
   - `explicit`: Load only tools explicitly listed in `--tool` options, ignoring all other filters
 - `--tool <toolId>`: Import only specified tool IDs or names. Can be used multiple times.
 - `--tag <tag>`: Import only tools with the specified OpenAPI tag. Can be used multiple times.
+- `--exclude-tag <tag>`: Exclude tools with the specified OpenAPI tag. Can be used multiple times.
 - `--resource <resource>`: Import only tools under the specified resource path prefixes. Can be used multiple times.
 - `--operation <method>`: Import only tools for the specified HTTP methods (get, post, etc). Can be used multiple times.
 
@@ -271,6 +272,9 @@ npx @ivotoby/openapi-mcp-server --api-base-url https://api.example.com --openapi
 
 # Load tools tagged with "user" under the "/users" resource
 npx @ivotoby/openapi-mcp-server --api-base-url https://api.example.com --openapi-spec https://api.example.com/openapi.json --tag user --resource users
+
+# Exclude tools with "file-operations" tag
+npx @ivotoby/openapi-mcp-server --api-base-url https://api.example.com --openapi-spec https://api.example.com/openapi.json --exclude-tag file-operations
 
 # Load only POST operations
 npx @ivotoby/openapi-mcp-server --api-base-url https://api.example.com --openapi-spec https://api.example.com/openapi.json --operation post
@@ -368,6 +372,7 @@ const config = {
   // Optional: Apply filters to control which tools are loaded
   includeTools: ["GET::users", "POST::users"], // Only these tools
   includeTags: ["public"], // Only tools with these tags
+  excludeTags: ["file-operations"], // Exclude tools with these tags
   includeResources: ["users"], // Only tools under these resources
   includeOperations: ["get", "post"], // Only these HTTP methods
 }

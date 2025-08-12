@@ -22,6 +22,8 @@ export interface OpenAPIMCPServerConfig {
   includeTools?: string[]
   /** Filter only specific tags */
   includeTags?: string[]
+  /** Exclude tools with specific tags */
+  excludeTags?: string[]
   /** Filter only specific resources (path prefixes) */
   includeResources?: string[]
   /** Filter only specific HTTP methods: get,post,put,... */
@@ -122,6 +124,11 @@ export function loadConfig(): OpenAPIMCPServerConfig {
       string: true,
       description: "Import only tools with specified OpenAPI tags",
     })
+    .option("exclude-tag", {
+      type: "array",
+      string: true,
+      description: "Exclude tools with specified OpenAPI tags",
+    })
     .option("resource", {
       type: "array",
       string: true,
@@ -220,6 +227,7 @@ export function loadConfig(): OpenAPIMCPServerConfig {
     endpointPath,
     includeTools: argv.tool as string[] | undefined,
     includeTags: argv.tag as string[] | undefined,
+    excludeTags: (argv["exclude-tag"] as string[] | undefined) || (process.env.EXCLUDE_TAGS ? process.env.EXCLUDE_TAGS.split(",") : undefined),
     includeResources: argv.resource as string[] | undefined,
     includeOperations: argv.operation as string[] | undefined,
     toolsMode: (argv.tools as "all" | "dynamic" | "explicit") || process.env.TOOLS_MODE || "all",
