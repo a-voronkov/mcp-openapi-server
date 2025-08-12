@@ -575,5 +575,36 @@ paths:
       expect((tool.inputSchema.properties! as any).body.type).toBe("string")
       expect(tool.inputSchema.required).toEqual(["body"])
     })
+
+    it("should normalize 'numeric' type to 'number' in parameters and request body", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Numeric API", version: "1.0.0" },
+        paths: {
+          "/payments": {
+            get: {
+              summary: "Get payments",
+              parameters: [
+                {
+                  name: "amount",
+                  in: "query",
+                  required: false,
+                  schema: { type: "numeric", minimum: 0 },
+                },
+              ],
+              requestBody: {
+                content: { "application/json": { schema: { type: "numeric" } } },
+              },
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("GET::payments")!
+      expect((tool.inputSchema.properties as any).amount.type).toBe("number")
+      expect((tool.inputSchema.properties as any).body.type).toBe("number")
+    })
   })
 })

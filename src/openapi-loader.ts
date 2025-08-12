@@ -77,7 +77,10 @@ export class OpenAPISpecLoader {
       throw error
     }
 
-    return this.parseSpecContent(specContent, inputMethod)
+    const doc = this.parseSpecContent(specContent, inputMethod)
+    // Normalize numeric -> number across the entire document eagerly
+    this.normalizeNumericTypesInObject(doc as any)
+    return doc
   }
 
   /**
@@ -161,6 +164,33 @@ export class OpenAPISpecLoader {
   }
 
   /**
+   * Recursively normalize any SchemaObject-like structures in-place:
+   * - Replace type: "numeric" with type: "number"
+   * - Replace arrays of types accordingly
+   */
+  private normalizeNumericTypesInObject(node: any): void {
+    if (node == null) return
+    if (Array.isArray(node)) {
+      for (const item of node) this.normalizeNumericTypesInObject(item)
+      return
+    }
+    if (typeof node !== "object") return
+
+    if (Object.prototype.hasOwnProperty.call(node, "type")) {
+      const value = (node as any).type
+      if (value === "numeric") {
+        ;(node as any).type = "number"
+      } else if (Array.isArray(value)) {
+        ;(node as any).type = value.map((v: any) => (v === "numeric" ? "number" : v))
+      }
+    }
+
+    for (const key of Object.keys(node)) {
+      this.normalizeNumericTypesInObject((node as any)[key])
+    }
+  }
+
+  /**
    * Inline `$ref` schemas from components and drop recursive cycles
    */
   private inlineSchema(
@@ -189,7 +219,20 @@ export class OpenAPISpecLoader {
     }
 
     // We know it's a SchemaObject now since ReferenceObject only has $ref
-    const schemaObj = schema as OpenAPIV3.SchemaObject
+    let schemaObj = schema as OpenAPIV3.SchemaObject
+
+    // Normalize non-standard numeric type to number (some specs use "numeric")
+    // This ensures downstream consumers (e.g., OpenAI tools) accept the schema
+    const t: any = (schemaObj as any).type
+    if (t === "numeric") {
+      schemaObj = { ...schemaObj, type: "number" }
+    } else if (Array.isArray(t)) {
+      const replaced = t.map((v: any) => (v === "numeric" ? "number" : v))
+      // Only set back if changed to avoid unnecessary object churn
+      if (replaced.some((v: any, i: number) => v !== t[i])) {
+        schemaObj = { ...schemaObj, type: replaced as any }
+      }
+    }
 
     // Handle schema composition keywords
     if (schemaObj.allOf) {
@@ -334,6 +377,8 @@ export class OpenAPISpecLoader {
 
     // Use explicit type if available
     if (paramSchema.type) {
+      // Normalize non-standard numeric type
+      if (paramSchema.type === "numeric") return "number"
       return paramSchema.type
     }
 
