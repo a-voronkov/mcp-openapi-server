@@ -606,5 +606,80 @@ paths:
       expect((tool.inputSchema.properties as any).amount.type).toBe("number")
       expect((tool.inputSchema.properties as any).body.type).toBe("number")
     })
+
+    it("should convert multipart/form-data file fields to base64-encoded strings", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Upload API", version: "1.0.0" },
+        paths: {
+          "/api/employers/jobs/{id}/media": {
+            post: {
+              parameters: [
+                { name: "id", in: "path", required: true, schema: { type: "integer" } },
+              ],
+              requestBody: {
+                content: {
+                  "multipart/form-data": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        type: { type: "string", enum: ["image", "video"] },
+                        file: { type: "string", format: "binary", description: "file to upload" },
+                      },
+                      required: ["type", "file"],
+                    },
+                    encoding: {
+                      file: { contentType: "image/jpeg" },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("POST::api__employers__jobs__---id__media")!
+      const props = tool.inputSchema.properties as any
+      expect(props.id.type).toBe("integer")
+      expect(props.type.type).toBe("string")
+      expect(props.file.type).toBe("string")
+      expect(props.file.contentEncoding).toBe("base64")
+      expect(props.file.contentMediaType).toBe("image/jpeg")
+      expect(tool.inputSchema.required).toEqual(["id", "type", "file"])
+      expect(props.file.format).toBeUndefined()
+    })
+
+    it("should convert application/octet-stream body to base64-encoded string with contentMediaType", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Octet API", version: "1.0.0" },
+        paths: {
+          "/upload/raw": {
+            post: {
+              requestBody: {
+                content: {
+                  "application/octet-stream": {
+                    schema: { type: "string", format: "binary" },
+                  },
+                },
+              },
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("POST::upload__raw")!
+      const body = (tool.inputSchema.properties as any).body
+      expect(body.type).toBe("string")
+      expect(body.contentEncoding).toBe("base64")
+      expect(body.contentMediaType).toBe("application/octet-stream")
+      expect(tool.inputSchema.required).toEqual(["body"])
+      expect(body.format).toBeUndefined()
+    })
   })
 })

@@ -234,6 +234,22 @@ export class OpenAPISpecLoader {
       }
     }
 
+    // Normalize file-like schemas to base64-encoded strings for JSON Schema/OpenAI
+    const typeVal: any = (schemaObj as any).type
+    const formatVal: any = (schemaObj as any).format
+    const isFileLike =
+      typeVal === "file" ||
+      formatVal === "file" ||
+      (typeVal === "string" && (formatVal === "binary" || formatVal === "byte"))
+    if (isFileLike) {
+      const { type, format, ...rest } = schemaObj as any
+      schemaObj = {
+        ...rest,
+        type: "string",
+        contentEncoding: "base64",
+      } as any
+    }
+
     // Handle schema composition keywords
     if (schemaObj.allOf) {
       // For allOf, merge all schemas into a single object schema
@@ -622,13 +638,16 @@ export class OpenAPISpecLoader {
 
           // Handle different content types
           let mediaTypeObj: OpenAPIV3.MediaTypeObject | undefined
+          let selectedContentType: string | undefined
 
           if (requestBodyObj.content["application/json"]) {
             mediaTypeObj = requestBodyObj.content["application/json"]
+            selectedContentType = "application/json"
           } else if (Object.keys(requestBodyObj.content).length > 0) {
             // Take the first available content type
             const firstContentType = Object.keys(requestBodyObj.content)[0]
             mediaTypeObj = requestBodyObj.content[firstContentType]
+            selectedContentType = firstContentType
           }
 
           if (mediaTypeObj?.schema) {
@@ -673,6 +692,13 @@ export class OpenAPISpecLoader {
 
                 tool.inputSchema.properties![paramName] = propSchema as OpenAPIV3.SchemaObject
 
+                // Attach contentMediaType from encoding map if provided (e.g., multipart/form-data per-field content types)
+                const encodingEntry = (mediaTypeObj as any).encoding?.[propName]
+                if (encodingEntry?.contentType) {
+                  ;(tool.inputSchema.properties![paramName] as any).contentMediaType =
+                    encodingEntry.contentType
+                }
+
                 if (inlinedSchema.required && inlinedSchema.required.includes(propName)) {
                   requiredParams.push(paramName)
                 }
@@ -680,6 +706,13 @@ export class OpenAPISpecLoader {
             } else {
               // Use body wrapper for other non-object schemas (primitives, arrays, etc.)
               tool.inputSchema.properties!["body"] = inlinedSchema
+
+              // If body is not JSON, annotate overall content media type
+              if (selectedContentType && selectedContentType !== "application/json") {
+                ;(tool.inputSchema.properties!["body"] as any).contentMediaType =
+                  selectedContentType
+              }
+
               requiredParams.push("body")
             }
           }

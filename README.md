@@ -553,6 +553,30 @@ The MCP server handles various OpenAPI schema complexities:
 - **Array Bodies**: Properly handles array schemas with their nested item definitions
 - **Required Properties**: Tracks and preserves which parameters and properties are required
 
+### File Type Normalization
+
+The server automatically normalizes file upload schemas for OpenAI/MCP compatibility:
+
+- **File Types**: Converts `type: "file"`, `format: "file"`, and `type: "string" + format: "binary"/"byte"` to `type: "string" + contentEncoding: "base64"`
+- **Content Media Types**: Preserves MIME type information via `contentMediaType` for multipart fields and non-JSON bodies
+- **Base64 Support**: Enables handling of file uploads through base64-encoded strings instead of binary data
+
+**Example transformation:**
+```yaml
+# OpenAPI spec
+file:
+  type: string
+  format: binary
+  description: "Upload file"
+
+# Generated MCP tool
+file:
+  type: "string"
+  contentEncoding: "base64"
+  description: "Upload file"
+  contentMediaType: "image/jpeg"  # From encoding.contentType
+```
+
 ---
 
 # Developer Information
@@ -622,6 +646,9 @@ A: The server fully resolves `$ref` references in parameters and schemas, preser
 
 **Q: What happens when parameter names conflict with request body properties?**
 A: The server detects naming conflicts and automatically prefixes body property names with `body_` to avoid collisions, ensuring all properties are accessible.
+
+**Q: How does the server handle file upload schemas?**
+A: The server automatically normalizes file types (`type: "file"`, `format: "binary"`, etc.) to `type: "string" + contentEncoding: "base64"` for OpenAI/MCP compatibility. This allows you to send base64-encoded file content instead of binary data, while preserving MIME type information via `contentMediaType`.
 
 **Q: Can I package my MCP server for distribution?**
 A: Yes! When using the library approach, you can create a dedicated npm package for your API. See the Beatport example for a complete implementation that can be packaged and distributed as `npx your-api-mcp-server`.
