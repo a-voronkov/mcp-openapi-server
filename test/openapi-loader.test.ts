@@ -681,5 +681,113 @@ paths:
       expect(tool.inputSchema.required).toEqual(["body"])
       expect(body.format).toBeUndefined()
     })
+
+    it("should normalize type: 'float' to type: 'number', format: 'float'", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Float API", version: "1.0.0" },
+        paths: {
+          "/measurements": {
+            post: {
+              requestBody: {
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        temperature: { type: "float", minimum: -273.15 },
+                        humidity: { type: "float", maximum: 100.0 },
+                      },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("POST::measurements")!
+      const props = tool.inputSchema.properties as any
+      expect(props.temperature.type).toBe("number")
+      expect(props.temperature.format).toBe("float")
+      expect(props.humidity.type).toBe("number")
+      expect(props.humidity.format).toBe("float")
+    })
+
+    it("should ensure enum fields have a type (default to 'string')", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Enum API", version: "1.0.0" },
+        paths: {
+          "/customer-form": {
+            post: {
+              requestBody: {
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        schedule_type: { enum: ["daily", "weekly", "monthly"] },
+                        status: { enum: ["active", "inactive"], type: "string" },
+                      },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("POST::customer-form")!
+      const props = tool.inputSchema.properties as any
+      expect(props.schedule_type.type).toBe("string")
+      expect(props.schedule_type.enum).toEqual(["daily", "weekly", "monthly"])
+      expect(props.status.type).toBe("string")
+      expect(props.status.enum).toEqual(["active", "inactive"])
+    })
+
+    it("should normalize example values to match field type", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Example API", version: "1.0.0" },
+        paths: {
+          "/upload-document": {
+            post: {
+              requestBody: {
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        document_type_id: { type: "integer", example: "125" },
+                        file_size: { type: "number", example: "1024.5" },
+                        name: { type: "string", example: "document.pdf" },
+                      },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("POST::upload-document")!
+      const props = tool.inputSchema.properties as any
+      expect(props.document_type_id.type).toBe("integer")
+      expect(props.document_type_id.example).toBe(125)
+      expect(props.file_size.type).toBe("number")
+      expect(props.file_size.example).toBe(1024.5)
+      expect(props.name.type).toBe("string")
+      expect(props.name.example).toBe("document.pdf")
+    })
   })
 })

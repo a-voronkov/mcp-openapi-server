@@ -250,6 +250,36 @@ export class OpenAPISpecLoader {
       } as any
     }
 
+    // Normalize type: "float" to type: "number", format: "float"
+    if (typeVal === "float") {
+      const { type, ...rest } = schemaObj as any
+      schemaObj = {
+        ...rest,
+        type: "number",
+        format: "float",
+      } as any
+    }
+
+    // Ensure enum fields have a type (default to "string" if missing)
+    if (schemaObj.enum && !schemaObj.type) {
+      schemaObj = { ...schemaObj, type: "string" }
+    }
+
+    // Normalize example values to match field type
+    if (schemaObj.example !== undefined && schemaObj.type) {
+      if (schemaObj.type === "integer" && typeof schemaObj.example === "string") {
+        const numValue = parseInt(schemaObj.example, 10)
+        if (!isNaN(numValue)) {
+          schemaObj = { ...schemaObj, example: numValue }
+        }
+      } else if (schemaObj.type === "number" && typeof schemaObj.example === "string") {
+        const numValue = parseFloat(schemaObj.example)
+        if (!isNaN(numValue)) {
+          schemaObj = { ...schemaObj, example: numValue }
+        }
+      }
+    }
+
     // Handle schema composition keywords
     if (schemaObj.allOf) {
       // For allOf, merge all schemas into a single object schema

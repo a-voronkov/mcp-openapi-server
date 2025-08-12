@@ -560,6 +560,9 @@ The server automatically normalizes file upload schemas for OpenAI/MCP compatibi
 - **File Types**: Converts `type: "file"`, `format: "file"`, and `type: "string" + format: "binary"/"byte"` to `type: "string" + contentEncoding: "base64"`
 - **Content Media Types**: Preserves MIME type information via `contentMediaType` for multipart fields and non-JSON bodies
 - **Base64 Support**: Enables handling of file uploads through base64-encoded strings instead of binary data
+- **Type Normalization**: Converts `type: "float"` to `type: "number", format: "float"` for JSON Schema compatibility
+- **Enum Type Enforcement**: Ensures enum fields have a type (defaults to "string" if missing)
+- **Example Value Normalization**: Converts example values to match field types (e.g., "125" → 125 for integer fields)
 
 **Example transformation:**
 ```yaml
@@ -575,6 +578,21 @@ file:
   contentEncoding: "base64"
   description: "Upload file"
   contentMediaType: "image/jpeg"  # From encoding.contentType
+```
+
+**Additional normalizations:**
+```yaml
+# Float type
+temperature: { type: "float", minimum: -273.15 }
+# → { type: "number", format: "float", minimum: -273.15 }
+
+# Enum without type
+schedule_type: { enum: ["daily", "weekly", "monthly"] }
+# → { type: "string", enum: ["daily", "weekly", "monthly"] }
+
+# Example type mismatch
+document_type_id: { type: "integer", example: "125" }
+# → { type: "integer", example: 125 }
 ```
 
 ---
