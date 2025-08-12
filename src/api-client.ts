@@ -32,6 +32,26 @@ export class ApiClient {
       baseURL: baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
     })
 
+    // Add request interceptor to log headers before sending requests
+    this.axiosInstance.interceptors.request.use((config) => {
+      // Axios may use AxiosHeaders which has toJSON for normalized headers
+      const rawHeaders: any =
+        // @ts-expect-error - AxiosHeaders may not be typed with toJSON in all versions
+        typeof (config.headers as any)?.toJSON === "function"
+          ? // @ts-expect-error - see above
+            (config.headers as any).toJSON()
+          : config.headers || {}
+
+      const sanitized = ApiClient.sanitizeHeadersForLogging(rawHeaders)
+      const method = String(config.method || "").toUpperCase()
+      const fullUrl = `${config.baseURL || ""}${config.url || ""}`
+      // Note: Console messages and UI strings are in English per repo style
+      console.debug(
+        `[ApiClient] ${method} ${fullUrl} - Request headers: ${JSON.stringify(sanitized)}`,
+      )
+      return config
+    })
+
     // Handle backward compatibility
     if (!authProviderOrHeaders) {
       this.authProvider = new StaticAuthProvider()
@@ -274,6 +294,34 @@ export class ApiClient {
     }
 
     return result
+  }
+
+  /**
+   * Sanitize headers for safe logging by redacting sensitive values
+   */
+  private static sanitizeHeadersForLogging(headers: Record<string, any> | undefined) {
+    const output: Record<string, any> = {}
+    if (!headers) return output
+
+    const sensitive = new Set([
+      "authorization",
+      "proxy-authorization",
+      "x-api-key",
+      "x-api-token",
+      "x-auth-token",
+      "x-access-token",
+      "cookie",
+      "set-cookie",
+    ])
+
+    for (const [key, value] of Object.entries(headers)) {
+      if (sensitive.has(key.toLowerCase())) {
+        output[key] = "[REDACTED]"
+      } else {
+        output[key] = value
+      }
+    }
+    return output
   }
 
   /**
