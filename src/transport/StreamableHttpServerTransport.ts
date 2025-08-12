@@ -6,6 +6,7 @@ import {
   isJSONRPCResponse,
 } from "@modelcontextprotocol/sdk/types.js"
 import * as http from "http"
+import { runWithRequestContext } from "../utils/request-context.js"
 import { randomUUID } from "crypto"
 
 /**
@@ -526,14 +527,21 @@ export class StreamableHttpServerTransport implements Transport {
                 }
                 session.pendingRequests.add(message.id)
               }
-              session.messageHandler(message) // Pass to protocol layer
+              // Pass to protocol layer within request context (headers + session)
+              runWithRequestContext(
+                { headers: req.headers as Record<string, string | string[] | undefined>, sessionId },
+                () => session.messageHandler(message),
+              )
               res.writeHead(202) // Respond 202 Accepted
               res.end()
             }
           } else {
             // Notification
             if (session.messageHandler) {
-              session.messageHandler(message)
+              runWithRequestContext(
+                { headers: req.headers as Record<string, string | string[] | undefined>, sessionId },
+                () => session.messageHandler(message),
+              )
               res.writeHead(202) // Acknowledge notification
               res.end()
             }
@@ -617,9 +625,13 @@ export class StreamableHttpServerTransport implements Transport {
     // Add this response handler to the session
     this.addInitResponseHandler(sessionId, responseHandler)
 
-    // Pass to message handler to let the Protocol layer process it
+    // Pass to message handler to let the Protocol layer process it (within request context)
     if (this.onmessage) {
-      this.onmessage(message)
+      runWithRequestContext(
+        // No req object here; initialize context with just sessionId
+        { sessionId },
+        () => this.onmessage!(message),
+      )
     } else {
       // No message handler, respond with an error
       this.removeInitResponseHandler(sessionId, responseHandler)

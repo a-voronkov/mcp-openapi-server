@@ -5,6 +5,7 @@ import { parseToolId as parseToolIdUtil, generateToolId } from "./utils/tool-id.
 import { isValidHttpMethod, isGetLikeMethod, VALID_HTTP_METHODS } from "./utils/http-methods.js"
 import { OpenAPISpecLoader } from "./openapi-loader.js"
 import { OpenAPIV3 } from "openapi-types"
+import { getRequestContext } from "./utils/request-context.js"
 
 /**
  * Client for making API calls to the backend service
@@ -35,11 +36,10 @@ export class ApiClient {
     // Add request interceptor to log headers before sending requests
     this.axiosInstance.interceptors.request.use((config) => {
       // Axios may use AxiosHeaders which has toJSON for normalized headers
+      const headersAny = config.headers as any
       const rawHeaders: any =
-        // @ts-expect-error - AxiosHeaders may not be typed with toJSON in all versions
-        typeof (config.headers as any)?.toJSON === "function"
-          ? // @ts-expect-error - see above
-            (config.headers as any).toJSON()
+        headersAny && typeof headersAny.toJSON === "function"
+          ? headersAny.toJSON()
           : config.headers || {}
 
       const sanitized = ApiClient.sanitizeHeadersForLogging(rawHeaders)
@@ -212,12 +212,14 @@ export class ApiClient {
 
       // Get fresh authentication headers
       const authHeaders = await this.authProvider.getAuthHeaders()
+      // Merge Authorization from incoming request context if present
+      const mergedHeaders = this.mergeContextAuthorization(authHeaders)
 
       // Prepare request configuration
       const config: any = {
         method: method.toLowerCase(),
         url: resolvedPath,
-        headers: authHeaders,
+        headers: mergedHeaders,
       }
 
       // Handle parameters based on HTTP method
@@ -539,13 +541,14 @@ export class ApiClient {
     params: Record<string, any>,
   ): Promise<any> {
     // Get fresh authentication headers
-    const authHeaders = await this.authProvider.getAuthHeaders()
+      const authHeaders = await this.authProvider.getAuthHeaders()
+      const mergedHeaders = this.mergeContextAuthorization(authHeaders)
 
     // Prepare request configuration
     const config: any = {
       method: method.toLowerCase(),
       url: path,
-      headers: authHeaders,
+        headers: mergedHeaders,
     }
 
     // Handle parameters based on HTTP method
@@ -578,5 +581,20 @@ export class ApiClient {
       }
       throw error
     }
+  }
+
+  /**
+   * Merge Authorization header from request context into provided base headers.
+   * Context Authorization takes precedence when present.
+   */
+  private mergeContextAuthorization(base: Record<string, string> | undefined): Record<string, string> {
+    const result: Record<string, string> = { ...(base || {}) }
+    const ctx = getRequestContext()
+    const auth = ctx?.headers?.["authorization"]
+    const authValue = Array.isArray(auth) ? auth[0] : auth
+    if (typeof authValue === "string" && authValue.trim().length > 0) {
+      result["Authorization"] = authValue
+    }
+    return result
   }
 }
