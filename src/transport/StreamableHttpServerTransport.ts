@@ -34,6 +34,16 @@ export class StreamableHttpServerTransport implements Transport {
   private started = false
   private maxBodySize = 4 * 1024 * 1024 // 4MB max request size
   private requestSessionMap: Map<string | number, string> = new Map() // Maps request IDs to session IDs
+  private static readonly SENSITIVE_HEADERS = new Set([
+    "authorization",
+    "proxy-authorization",
+    "x-api-key",
+    "x-api-token",
+    "x-auth-token",
+    "x-access-token",
+    "cookie",
+    "set-cookie",
+  ])
 
   /**
    * Initialize a new StreamableHttpServerTransport
@@ -252,12 +262,15 @@ export class StreamableHttpServerTransport implements Transport {
 
     switch (req.method) {
       case "POST":
+        this.logIncomingRequest(req)
         this.handlePostRequest(req, res)
         break
       case "GET":
+        this.logIncomingRequest(req)
         this.handleGetRequest(req, res)
         break
       case "DELETE":
+        this.logIncomingRequest(req)
         this.handleDeleteRequest(req, res)
         break
       default:
@@ -274,6 +287,44 @@ export class StreamableHttpServerTransport implements Transport {
           }),
         )
     }
+  }
+
+  /**
+   * Log incoming request headers with sensitive values redacted.
+   */
+  private logIncomingRequest(req: http.IncomingMessage): void {
+    const method = req.method || ""
+    const url = req.url || ""
+    const headers = req.headers || {}
+
+    const sanitized: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(headers)) {
+      if (StreamableHttpServerTransport.SENSITIVE_HEADERS.has(key.toLowerCase())) {
+        sanitized[key] = "[REDACTED]"
+      } else {
+        sanitized[key] = value
+      }
+    }
+
+    const authRaw = headers["authorization"]
+    const authPreview = Array.isArray(authRaw) ? authRaw[0] : authRaw
+    // Keep only scheme prefix for Authorization (e.g., "Bearer ****")
+    let authShown: string | undefined
+    if (typeof authPreview === "string") {
+      const spaceIdx = authPreview.indexOf(" ")
+      if (spaceIdx > 0) {
+        authShown = `${authPreview.slice(0, spaceIdx)} [REDACTED]`
+      } else if (authPreview.length > 0) {
+        authShown = "[REDACTED]"
+      }
+    }
+
+    // Note: Console messages are in English per repository style
+    console.debug(
+      `[HTTP] ${method} ${url} - Incoming headers: ${JSON.stringify(sanitized)}${
+        authShown ? ` | Authorization: ${authShown}` : ""
+      }`,
+    )
   }
 
   /**
