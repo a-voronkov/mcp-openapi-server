@@ -22,6 +22,11 @@ This document outlines the plan for improving test coverage and functionality in
 - **✅ COMPLETED** - Normalize example values to match field type (e.g., "125" → 125 for integer fields)
 - **✅ COMPLETED** - Add comprehensive tests for all normalization scenarios
 
+### ✅ Parameter Name Normalization
+- **✅ COMPLETED** - Normalize parameter names by removing square brackets (e.g., "services_ids[]" → "services_ids")
+- **✅ COMPLETED** - This makes JSON Schema more compatible with clients and agents
+- **✅ COMPLETED** - Add comprehensive tests for array parameter name normalization
+
 ### ✅ Header and Cookie Parameters
 - **✅ COMPLETED** - Add explicit tests to ensure parameters `in: "header"` and `in: "cookie"` are correctly processed into `inputSchema` with appropriate `x-parameter-location`.
 - **✅ COMPLETED** - Add comprehensive tests for parameters with `x-parameter-location`:
@@ -71,6 +76,43 @@ The server also normalizes other problematic OpenAPI types for JSON Schema compa
 **Example value normalization:**
 - `type: "integer", example: "125"` → `type: "integer", example: 125`
 - `type: "number", example: "1024.5"` → `type: "number", example: 1024.5`
+
+### Parameter Name Normalization
+The server automatically normalizes parameter names by removing square brackets for better JSON Schema compatibility:
+
+**Before (OpenAPI):**
+```yaml
+parameters:
+  - name: "services_ids[]"
+    in: "query"
+    schema: { type: "array", items: { type: "integer" } }
+  - name: "skill_ids[]"
+    in: "query"
+    schema: { type: "array", items: { type: "integer" } }
+```
+
+**After (MCP Tool):**
+```json
+{
+  "properties": {
+    "services_ids": {
+      "type": "array",
+      "items": { "type": "integer" }
+    },
+    "skill_ids": {
+      "type": "array",
+      "items": { "type": "integer" }
+    }
+  }
+}
+```
+
+**Supported conversions:**
+- `services_ids[]` → `services_ids`
+- `skill_ids[]` → `skill_ids`
+- `colors[]` → `colors`
+- `categories[]` → `categories`
+- `languages_ids[]` → `languages_ids`
 
 ### Content Media Type Support
 - **Multipart fields**: `encoding[field].contentType` is mapped to `contentMediaType`

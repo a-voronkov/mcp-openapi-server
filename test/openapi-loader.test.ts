@@ -789,5 +789,67 @@ paths:
       expect(props.name.type).toBe("string")
       expect(props.name.example).toBe("document.pdf")
     })
+
+    it("should normalize parameter names by removing square brackets", () => {
+      const spec: OpenAPIV3.Document = {
+        openapi: "3.0.0",
+        info: { title: "Array Parameters API", version: "1.0.0" },
+        paths: {
+          "/test": {
+            get: {
+              summary: "Test array parameters",
+              parameters: [
+                {
+                  name: "services_ids[]",
+                  in: "query",
+                  required: false,
+                  schema: { type: "array", items: { type: "integer" } },
+                },
+                {
+                  name: "skill_ids[]",
+                  in: "query",
+                  required: false,
+                  schema: { type: "array", items: { type: "integer" } },
+                },
+                {
+                  name: "colors[]",
+                  in: "query",
+                  required: false,
+                  schema: { type: "array", items: { type: "string" } },
+                },
+                {
+                  name: "categories[]",
+                  in: "query",
+                  required: false,
+                  schema: { type: "array", items: { type: "string" } },
+                },
+              ],
+              responses: { "200": { description: "OK" } },
+            },
+          },
+        },
+      }
+
+      const tools = openAPILoader.parseOpenAPISpec(spec)
+      const tool = tools.get("GET::test")!
+
+      // Check that square brackets are removed from parameter names
+      expect(tool.inputSchema.properties).toHaveProperty("services_ids")
+      expect(tool.inputSchema.properties).toHaveProperty("skill_ids")
+      expect(tool.inputSchema.properties).toHaveProperty("colors")
+      expect(tool.inputSchema.properties).toHaveProperty("categories")
+
+      // Check that the original names with brackets are not present
+      expect(tool.inputSchema.properties).not.toHaveProperty("services_ids[]")
+      expect(tool.inputSchema.properties).not.toHaveProperty("skill_ids[]")
+      expect(tool.inputSchema.properties).not.toHaveProperty("colors[]")
+      expect(tool.inputSchema.properties).not.toHaveProperty("categories[]")
+
+      // Check that the schema properties are preserved
+      expect(tool.inputSchema.properties!.services_ids.type).toBe("array")
+      expect(tool.inputSchema.properties!.skill_ids.type).toBe("array")
+      expect(tool.inputSchema.properties!.colors.type).toBe("array")
+      expect(tool.inputSchema.properties!.categories.type).toBe("array")
+    })
   })
 })

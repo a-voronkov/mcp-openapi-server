@@ -482,6 +482,14 @@ export class OpenAPISpecLoader {
   }
 
   /**
+   * Normalize parameter names by removing square brackets (e.g., "services_ids[]" -> "services_ids")
+   * This makes JSON Schema more compatible with clients and agents
+   */
+  private normalizeParameterName(name: string): string {
+    return name.replace(/\[\]$/, '')
+  }
+
+  /**
    * Parse an OpenAPI specification into a map of tools
    */
   parseOpenAPISpec(spec: OpenAPIV3.Document): Map<string, Tool> {
@@ -576,8 +584,9 @@ export class OpenAPISpecLoader {
 
         // First, add path-level parameters
         for (const pathParam of pathLevelParameters) {
-          const key = `${pathParam.name}::${pathParam.in}`
-          parameterMap.set(key, pathParam)
+          const normalizedName = this.normalizeParameterName(pathParam.name)
+          const key = `${normalizedName}::${pathParam.in}`
+          parameterMap.set(key, { ...pathParam, name: normalizedName })
         }
 
         // Then, add operation-level parameters (these can override path-level ones)
@@ -615,8 +624,9 @@ export class OpenAPISpecLoader {
             }
 
             if (paramObj) {
-              const key = `${paramObj.name}::${paramObj.in}`
-              parameterMap.set(key, paramObj) // This will override path-level parameters
+              const normalizedName = this.normalizeParameterName(paramObj.name)
+              const key = `${normalizedName}::${paramObj.in}`
+              parameterMap.set(key, { ...paramObj, name: normalizedName }) // This will override path-level parameters
             }
           }
         }
@@ -624,6 +634,9 @@ export class OpenAPISpecLoader {
         // Process all parameters (path-level + operation-level, with operation-level taking precedence)
         for (const paramObj of parameterMap.values()) {
           if (paramObj.schema) {
+            // Normalize parameter name by removing square brackets
+            const normalizedName = this.normalizeParameterName(paramObj.name)
+            
             // Get the fully inlined schema with all nested references resolved
             const paramSchema = this.inlineSchema(
               paramObj.schema as OpenAPIV3.SchemaObject | OpenAPIV3.ReferenceObject,
@@ -633,12 +646,12 @@ export class OpenAPISpecLoader {
 
             // Create the parameter definition
             const paramDef: any = {
-              description: paramObj.description || `${paramObj.name} parameter`,
+              description: paramObj.description || `${normalizedName} parameter`,
               "x-parameter-location": paramObj.in, // Store parameter location (path, query, etc.)
             }
 
             // Determine and set the appropriate type
-            const paramType = this.determineParameterType(paramSchema, paramObj.name)
+            const paramType = this.determineParameterType(paramSchema, normalizedName)
             if (paramType !== undefined) {
               paramDef.type = paramType
             }
@@ -654,10 +667,10 @@ export class OpenAPISpecLoader {
             }
 
             // Add the schema to the tool's input schema properties
-            tool.inputSchema.properties![paramObj.name] = paramDef
+            tool.inputSchema.properties![normalizedName] = paramDef
 
             if (paramObj.required === true) {
-              requiredParams.push(paramObj.name)
+              requiredParams.push(normalizedName)
             }
           }
         }

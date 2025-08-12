@@ -563,6 +563,7 @@ The server automatically normalizes file upload schemas for OpenAI/MCP compatibi
 - **Type Normalization**: Converts `type: "float"` to `type: "number", format: "float"` for JSON Schema compatibility
 - **Enum Type Enforcement**: Ensures enum fields have a type (defaults to "string" if missing)
 - **Example Value Normalization**: Converts example values to match field types (e.g., "125" → 125 for integer fields)
+- **Parameter Name Normalization**: Removes square brackets from array parameter names (e.g., "services_ids[]" → "services_ids") for better JSON Schema compatibility
 
 **Example transformation:**
 ```yaml
@@ -666,7 +667,10 @@ A: The server fully resolves `$ref` references in parameters and schemas, preser
 A: The server detects naming conflicts and automatically prefixes body property names with `body_` to avoid collisions, ensuring all properties are accessible.
 
 **Q: How does the server handle file upload schemas?**
-A: The server automatically normalizes file types (`type: "file"`, `format: "binary"`, etc.) to `type: "string" + contentEncoding: "base64"` for OpenAI/MCP compatibility. This allows you to send base64-encoded file content instead of binary data, while preserving MIME type information via `contentMediaType`.
+A: The server automatically normalizes file types (`type: "file"`, `format: "binary"`, etc.) to `type: "string" + contentEncoding: "base64"` for OpenAI/MCP compatibility. This allows you to send base64-encoded file content instead of binary data, while preserving MIME type information.
+
+**Q: How does the server handle array parameter names with square brackets?**
+A: The server automatically normalizes parameter names by removing square brackets (e.g., "services_ids[]" → "services_ids") for better JSON Schema compatibility. This makes the generated schemas more compatible with clients and agents while preserving the array type information.
 
 **Q: Can I package my MCP server for distribution?**
 A: Yes! When using the library approach, you can create a dedicated npm package for your API. See the Beatport example for a complete implementation that can be packaged and distributed as `npx your-api-mcp-server`.
