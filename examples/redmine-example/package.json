@@ -1,0 +1,28 @@
+{
+  "name": "redmine-mcp-example",
+  "version": "1.0.0",
+  "description": "Example of using MCP OpenAPI server with Redmine API",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc && node dist/index.js"
+  },
+  "dependencies": {
+    "@ivotoby/openapi-mcp-server": "file:../../"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "redmine",
+    "openapi",
+    "api",
+    "authentication"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

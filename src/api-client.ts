@@ -585,16 +585,26 @@ export class ApiClient {
 
   /**
    * Merge Authorization header from request context into provided base headers.
-   * Context Authorization takes precedence when present.
+   * AuthProvider headers take precedence over context Authorization when present.
    */
   private mergeContextAuthorization(base: Record<string, string> | undefined): Record<string, string> {
     const result: Record<string, string> = { ...(base || {}) }
     const ctx = getRequestContext()
     const auth = ctx?.headers?.["authorization"]
     const authValue = Array.isArray(auth) ? auth[0] : auth
+    
+    // Only add Authorization from context if:
+    // 1. AuthProvider didn't provide any auth headers, OR
+    // 2. AuthProvider didn't provide X-Redmine-API-Key (for Redmine compatibility)
+    const hasAuthProviderHeaders = base && Object.keys(base).length > 0
+    const hasRedmineApiKey = base && base["X-Redmine-API-Key"]
+    
     if (typeof authValue === "string" && authValue.trim().length > 0) {
-      result["Authorization"] = authValue
+      if (!hasAuthProviderHeaders || !hasRedmineApiKey) {
+        result["Authorization"] = authValue
+      }
     }
+    
     return result
   }
 }

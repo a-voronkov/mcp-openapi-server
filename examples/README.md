@@ -52,6 +52,19 @@ These examples focus on the **library usage**, showing how to create dedicated, 
 
 **When to use**: As a template for creating production-ready MCP servers for specific APIs.
 
+### 4. [Redmine Example](./redmine-example/)
+
+**Purpose**: Demonstrates how to handle APIs that don't support Bearer token authentication.
+
+**Key Features**:
+
+- Custom AuthProvider for Redmine API key authentication
+- Proper handling of X-Redmine-API-Key headers
+- User impersonation support (X-Redmine-Switch-User)
+- Fixes the common issue of MCP server proxying wrong Authorization headers
+
+**When to use**: When your API uses non-standard authentication (like Redmine's API key headers) instead of Bearer tokens.
+
 ## Key Concepts Demonstrated
 
 ### Library vs CLI Usage
@@ -112,6 +125,7 @@ All examples demonstrate different configuration patterns:
 - **Simple API with static auth** → Start with [Basic Library Usage](./basic-library-usage/)
 - **API with token expiration** → Use [AuthProvider Example](./auth-provider-example/)
 - **Production deployment** → Follow [Beatport Example](./beatport-example/) patterns
+- **API with non-standard auth** → Use [Redmine Example](./redmine-example/) for custom authentication
 
 ### 2. Copy and Customize
 
