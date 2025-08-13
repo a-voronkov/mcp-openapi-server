@@ -373,6 +373,7 @@ export class StreamableHttpServerTransport implements Transport {
             }),
           )
         }
+        console.error(`StreamableHttpServerTransport: Origin ${origin} not allowed`)
         return false
       }
       
@@ -398,6 +399,7 @@ export class StreamableHttpServerTransport implements Transport {
             }),
           )
         }
+        console.error(`StreamableHttpServerTransport: Origin ${origin} not allowed`)
         return false
       }
 
@@ -417,6 +419,7 @@ export class StreamableHttpServerTransport implements Transport {
           }),
         )
       }
+      console.error(`StreamableHttpServerTransport: Invalid origin ${origin}`)
       return false
     }
   }
@@ -439,6 +442,7 @@ export class StreamableHttpServerTransport implements Transport {
           id: null,
         }),
       )
+      console.error(`StreamableHttpServerTransport: Unsupported Media Type: Content-Type must be application/json`)
       return
     }
 
@@ -461,6 +465,7 @@ export class StreamableHttpServerTransport implements Transport {
           }),
         )
         req.destroy()
+        console.error(`StreamableHttpServerTransport: Request entity too large`)
         return
       }
       body += chunk.toString()
@@ -490,6 +495,7 @@ export class StreamableHttpServerTransport implements Transport {
                 id: "id" in message ? message.id : null,
               }),
             )
+            console.error(`StreamableHttpServerTransport: Invalid session. A valid Mcp-Session-Id header is required.`)
             return
           }
 
@@ -542,6 +548,7 @@ export class StreamableHttpServerTransport implements Transport {
                 id: "id" in message ? message.id : null,
               }),
             )
+            console.error(`StreamableHttpServerTransport: Internal error: No message handler available`)
           }
         } else {
           // Handle regular requests (asynchronous - 202 on POST, response on GET stream)
@@ -559,6 +566,7 @@ export class StreamableHttpServerTransport implements Transport {
                 id: "id" in message ? message.id : null,
               }),
             )
+            console.error(`StreamableHttpServerTransport: Invalid session. A valid Mcp-Session-Id header is required.`)
             return
           }
 
@@ -613,6 +621,7 @@ export class StreamableHttpServerTransport implements Transport {
               id: null,
             }),
           )
+          console.error(`StreamableHttpServerTransport: Parse error: ${String(err)}`)
         }
 
         if (this.onerror) {
@@ -705,6 +714,7 @@ export class StreamableHttpServerTransport implements Transport {
           }),
         )
       }
+      console.error(`StreamableHttpServerTransport: Internal error: No message handler available`)
     }
   }
 
@@ -758,6 +768,7 @@ export class StreamableHttpServerTransport implements Transport {
           id: null,
         }),
       )
+      console.error(`StreamableHttpServerTransport: Invalid session. A valid Mcp-Session-Id header is required.`)
       return
     }
 
@@ -808,6 +819,7 @@ export class StreamableHttpServerTransport implements Transport {
           id: null,
         }),
       )
+      console.error(`StreamableHttpServerTransport: Invalid session. A valid Mcp-Session-Id header is required.`)
       return
     }
 
