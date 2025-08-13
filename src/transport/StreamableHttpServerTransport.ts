@@ -52,11 +52,13 @@ export class StreamableHttpServerTransport implements Transport {
    * @param port HTTP port to listen on
    * @param host Host to bind to (default: 127.0.0.1)
    * @param endpointPath Endpoint path (default: /mcp)
+   * @param allowedOrigins List of allowed origins for CORS (default: localhost only)
    */
   constructor(
     private port: number,
     private host: string = "127.0.0.1",
     private endpointPath: string = "/mcp",
+    private allowedOrigins?: string[],
   ) {
     this.server = http.createServer(this.handleRequest.bind(this))
   }
@@ -253,13 +255,17 @@ export class StreamableHttpServerTransport implements Transport {
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     // Only handle requests to the MCP endpoint
     if (req.url !== this.endpointPath) {
-      res.writeHead(404)
-      res.end()
+      if (!res.headersSent) {
+        res.writeHead(404)
+        res.end()
+      }
       return
     }
 
     // Validate origin header to prevent DNS rebinding attacks
-    this.validateOrigin(req, res)
+    if (!this.validateOrigin(req, res)) {
+      return // validateOrigin already sent response
+    }
 
     switch (req.method) {
       case "POST":
@@ -276,17 +282,19 @@ export class StreamableHttpServerTransport implements Transport {
         break
       default:
         // Method not allowed
-        res.writeHead(405, { Allow: "POST, GET, DELETE" })
-        res.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32000,
-              message: "Method not allowed",
-            },
-            id: null,
-          }),
-        )
+        if (!res.headersSent) {
+          res.writeHead(405, { Allow: "POST, GET, DELETE" })
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: "Method not allowed",
+              },
+              id: null,
+            }),
+          )
+        }
     }
   }
 
@@ -339,41 +347,76 @@ export class StreamableHttpServerTransport implements Transport {
       return true
     }
 
-    // In a production implementation, you would validate the origin against a whitelist
-    // This is a simplified check that assumes local development
+    // If allowedOrigins is configured, use that list
+    if (this.allowedOrigins && this.allowedOrigins.length > 0) {
+      const isAllowed = this.allowedOrigins.some(allowedOrigin => {
+        // Support wildcard domains (e.g., "*.example.com")
+        if (allowedOrigin.startsWith("*.")) {
+          const domain = allowedOrigin.slice(2)
+          return origin.endsWith(domain)
+        }
+        // Support exact match
+        return origin === allowedOrigin
+      })
+      
+      if (!isAllowed) {
+        if (!res.headersSent) {
+          res.writeHead(403)
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: "Origin not allowed",
+              },
+              id: null,
+            }),
+          )
+        }
+        return false
+      }
+      
+      return true
+    }
+
+    // Default behavior: only allow localhost (for backward compatibility)
     try {
       const originUrl = new URL(origin)
       const isLocalhost = originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1"
 
       if (!isLocalhost) {
-        res.writeHead(403)
-        res.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32000,
-              message: "Origin not allowed",
-            },
-            id: null,
-          }),
-        )
+        if (!res.headersSent) {
+          res.writeHead(403)
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: "Origin not allowed",
+              },
+              id: null,
+            }),
+          )
+        }
         return false
       }
 
       return true
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
-      res.writeHead(400)
-      res.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: "Invalid origin",
-          },
-          id: null,
-        }),
-      )
+      if (!res.headersSent) {
+        res.writeHead(400)
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32000,
+              message: "Invalid origin",
+            },
+            id: null,
+          }),
+        )
+      }
       return false
     }
   }
@@ -464,9 +507,12 @@ export class StreamableHttpServerTransport implements Transport {
           // Prepare response handler that will send the actual tools/list response on this POST
           const responseHandler = (responseMessage: JSONRPCMessage): void => {
             if (isJSONRPCResponse(responseMessage) && responseMessage.id === message.id) {
-              res.setHeader("Content-Type", "application/json")
-              res.writeHead(200)
-              res.end(JSON.stringify(responseMessage))
+              // Check if headers have already been sent
+              if (!res.headersSent) {
+                res.setHeader("Content-Type", "application/json")
+                res.writeHead(200)
+                res.end(JSON.stringify(responseMessage))
+              }
 
               // Clean up mappings and handlers
               this.removeInitResponseHandler(sessionId, responseHandler)
@@ -532,8 +578,11 @@ export class StreamableHttpServerTransport implements Transport {
                 { headers: req.headers as Record<string, string | string[] | undefined>, sessionId },
                 () => session.messageHandler(message),
               )
-              res.writeHead(202) // Respond 202 Accepted
-              res.end()
+              // Check if headers have already been sent
+              if (!res.headersSent) {
+                res.writeHead(202) // Respond 202 Accepted
+                res.end()
+              }
             }
           } else {
             // Notification
@@ -542,24 +591,29 @@ export class StreamableHttpServerTransport implements Transport {
                 { headers: req.headers as Record<string, string | string[] | undefined>, sessionId },
                 () => session.messageHandler(message),
               )
-              res.writeHead(202) // Acknowledge notification
-              res.end()
+              // Check if headers have already been sent
+              if (!res.headersSent) {
+                res.writeHead(202) // Acknowledge notification
+                res.end()
+              }
             }
           }
         }
       } catch (err) {
-        res.writeHead(400)
-        res.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32700,
-              message: "Parse error",
-              data: String(err),
-            },
-            id: null,
-          }),
-        )
+        if (!res.headersSent) {
+          res.writeHead(400)
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32700,
+                message: "Parse error",
+                data: String(err),
+              },
+              id: null,
+            }),
+          )
+        }
 
         if (this.onerror) {
           this.onerror(new Error(`Parse error: ${String(err)}`))
@@ -610,9 +664,12 @@ export class StreamableHttpServerTransport implements Transport {
         "id" in message &&
         responseMessage.id === message.id
       ) {
-        // Send the actual response that includes the server's capabilities
-        res.writeHead(200)
-        res.end(JSON.stringify(responseMessage))
+        // Check if headers have already been sent
+        if (!res.headersSent) {
+          // Send the actual response that includes the server's capabilities
+          res.writeHead(200)
+          res.end(JSON.stringify(responseMessage))
+        }
 
         // Remove this one-time handler
         this.removeInitResponseHandler(sessionId, responseHandler)
@@ -635,17 +692,19 @@ export class StreamableHttpServerTransport implements Transport {
     } else {
       // No message handler, respond with an error
       this.removeInitResponseHandler(sessionId, responseHandler)
-      res.writeHead(500)
-      res.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: {
-            code: -32603,
-            message: "Internal error: No message handler available",
-          },
-          id: "id" in message ? message.id : null,
-        }),
-      )
+      if (!res.headersSent) {
+        res.writeHead(500)
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32603,
+              message: "Internal error: No message handler available",
+            },
+            id: "id" in message ? message.id : null,
+          }),
+        )
+      }
     }
   }
 

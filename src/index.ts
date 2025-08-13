@@ -22,6 +22,7 @@ async function main(): Promise<void> {
         config.httpPort!,
         config.httpHost,
         config.endpointPath,
+        config.allowedOrigins,
       )
       await server.start(transport)
       console.error(
@@ -32,6 +33,8 @@ async function main(): Promise<void> {
       await server.start(transport)
       console.error("OpenAPI MCP Server running on stdio")
     }
+    console.error(`API Base URL: ${config.apiBaseUrl}`)
+    console.error(`API specification ${config.specInputMethod}: ${config.openApiSpec}`)
   } catch (error) {
     console.error("Failed to start server:", error)
     process.exit(1)

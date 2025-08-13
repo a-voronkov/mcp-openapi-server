@@ -18,6 +18,8 @@ export interface OpenAPIMCPServerConfig {
   httpPort?: number
   httpHost?: string
   endpointPath?: string
+  /** Allowed origins for CORS (comma-separated list) */
+  allowedOrigins?: string[]
   /** Filter only specific tool IDs or names */
   includeTools?: string[]
   /** Filter only specific tags */
@@ -75,6 +77,10 @@ export function loadConfig(): OpenAPIMCPServerConfig {
     .option("path", {
       type: "string",
       description: "HTTP endpoint path for HTTP transport",
+    })
+    .option("allowed-origins", {
+      type: "string",
+      description: "Comma-separated list of allowed origins for CORS",
     })
     .option("api-base-url", {
       alias: "u",
@@ -158,6 +164,10 @@ export function loadConfig(): OpenAPIMCPServerConfig {
   const httpPort = argv.port ?? (process.env.HTTP_PORT ? parseInt(process.env.HTTP_PORT, 10) : 3000)
   const httpHost = argv.host || process.env.HTTP_HOST || "127.0.0.1"
   const endpointPath = argv.path || process.env.ENDPOINT_PATH || "/mcp"
+  
+  // Parse allowed origins
+  const allowedOriginsStr = argv["allowed-origins"] || process.env.ALLOWED_ORIGINS
+  const allowedOrigins = allowedOriginsStr ? allowedOriginsStr.split(",").map(s => s.trim()) : undefined
 
   // Determine spec input method and validate
   const specFromStdin = argv["spec-from-stdin"] || process.env.OPENAPI_SPEC_FROM_STDIN === "true"
@@ -225,6 +235,7 @@ export function loadConfig(): OpenAPIMCPServerConfig {
     httpPort,
     httpHost,
     endpointPath,
+    allowedOrigins,
     includeTools: argv.tool as string[] | undefined,
     includeTags: argv.tag as string[] | undefined,
     excludeTags: (argv["exclude-tag"] as string[] | undefined) || (process.env.EXCLUDE_TAGS ? process.env.EXCLUDE_TAGS.split(",") : undefined),
