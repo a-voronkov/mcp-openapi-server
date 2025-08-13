@@ -585,7 +585,7 @@ export class ApiClient {
 
   /**
    * Merge Authorization header from request context into provided base headers.
-   * AuthProvider headers take precedence over context Authorization when present.
+   * For Redmine compatibility: extract Bearer token and convert to X-Redmine-API-Key
    */
   private mergeContextAuthorization(base: Record<string, string> | undefined): Record<string, string> {
     const result: Record<string, string> = { ...(base || {}) }
@@ -593,18 +593,33 @@ export class ApiClient {
     const auth = ctx?.headers?.["authorization"]
     const authValue = Array.isArray(auth) ? auth[0] : auth
     
-    // Only add Authorization from context if:
-    // 1. AuthProvider didn't provide any auth headers, OR
-    // 2. AuthProvider didn't provide X-Redmine-API-Key (for Redmine compatibility)
-    const hasAuthProviderHeaders = base && Object.keys(base).length > 0
-    const hasRedmineApiKey = base && base["X-Redmine-API-Key"]
+    console.debug(`[ApiClient] mergeContextAuthorization: authValue="${authValue}", base headers:`, Object.keys(base || {}))
     
     if (typeof authValue === "string" && authValue.trim().length > 0) {
-      if (!hasAuthProviderHeaders || !hasRedmineApiKey) {
-        result["Authorization"] = authValue
+      // Check if this is a Bearer token
+      if (authValue.startsWith("Bearer ")) {
+        const token = authValue.substring(7) // Remove "Bearer " prefix
+        console.debug(`[ApiClient] Extracted Bearer token: ${token.substring(0, 8)}...`)
+        
+        // For Redmine: convert Bearer token to X-Redmine-API-Key
+        result["X-Redmine-API-Key"] = token
       }
+      result["Authorization"] = authValue
     }
     
+    console.debug(`[ApiClient] Final headers:`, Object.keys(result))
     return result
+  }
+
+  /**
+   * Check if the current request is going to Redmine
+   * This is a simple heuristic - you can make it more sophisticated
+   */
+  private isRedmineRequest(): boolean {
+    // Check if baseURL contains redmine
+    const baseURL = this.axiosInstance.defaults.baseURL || ""
+    const isRedmine = baseURL.toLowerCase().includes("redmine")
+    console.debug(`[ApiClient] Checking if Redmine request: baseURL="${baseURL}" -> ${isRedmine}`)
+    return isRedmine
   }
 }
