@@ -3,12 +3,36 @@
  */
 
 /**
+ * Replace dots with _dot_ in method names and parameter names for MCP compatibility
+ * This ensures compatibility with MCP clients that don't support dots in method names
+ * 
+ * @param input - String that may contain dots
+ * @returns String with dots replaced by _dot_
+ */
+function replaceDotsForMCP(input: string): string {
+  return input.replace(/\./g, "_dot_")
+}
+
+/**
+ * Restore dots from _dot_ in method names and parameter names
+ * This reverses the replacement done by replaceDotsForMCP
+ * 
+ * @param input - String that may contain _dot_
+ * @returns String with _dot_ replaced by dots
+ */
+function restoreDotsFromMCP(input: string): string {
+  return input.replace(/_dot_/g, ".")
+}
+
+/**
  * Parse a tool ID into HTTP method and path
  *
  * Tool IDs have the format: METHOD::pathPart
  * Where pathPart has slashes converted to double underscores (__) for storage/transmission.
  * This approach avoids the ambiguity issues with hyphen-based escaping since double
  * underscores are extremely rare in real API paths.
+ * 
+ * Dots in method names and parameter names are automatically replaced with _dot_ for MCP compatibility.
  *
  * @param toolId - Tool ID in format METHOD::pathPart
  * @returns Object containing method and path
@@ -18,17 +42,19 @@
  * parseToolId("POST::api__v1__users") → { method: "POST", path: "/api/v1/users" }
  * parseToolId("PUT::user_profile__data") → { method: "PUT", path: "/user_profile/data" }
  * parseToolId("GET::api__resource-name__items") → { method: "GET", path: "/api/resource-name/items" }
+ * parseToolId("POST::api__v1_dot_2__users") → { method: "POST", path: "/api/v1.2/users" }
  */
 export function parseToolId(toolId: string): { method: string; path: string } {
   const [method, pathPart] = toolId.split("::", 2)
   if (!pathPart) {
-    return { method, path: "" }
+    return { method: restoreDotsFromMCP(method), path: "" }
   }
 
   // Simply replace double underscores with slashes - no complex escaping needed
-  const path = pathPart.replace(/__/g, "/")
+  // Also restore dots from _dot_ for MCP compatibility
+  const path = pathPart.replace(/__/g, "/").replace(/_dot_/g, ".")
 
-  return { method, path: "/" + path }
+  return { method: restoreDotsFromMCP(method), path: "/" + path }
 }
 
 /**
@@ -87,6 +113,9 @@ function collapseExcessiveHyphens(input: string): string {
  * hyphen-based escaping scheme since __ is extremely rare in real API paths.
  * Path parameters {param} are converted to ---param to preserve the parameter location
  * information for accurate replacement during API calls.
+ * 
+ * Dots in method names and parameter names are automatically replaced with _dot_ for MCP compatibility.
+ * This ensures compatibility with MCP clients that don't support dots in method names.
  *
  * @param method - HTTP method (GET, POST, etc.)
  * @param path - API path (e.g., "/users/{id}")
@@ -100,6 +129,7 @@ function collapseExcessiveHyphens(input: string): string {
  * generateToolId("GET", "/api/resource-name/items") → "GET::api__resource-name__items"
  * generateToolId("POST", "/user-profile/data") → "POST::user-profile__data"
  * generateToolId("GET", "/api/--existing-double/test") → "GET::api__--existing-double__test"
+ * generateToolId("POST", "/api/v1.2/users") → "POST::api__v1_dot_2__users"
  */
 export function generateToolId(method: string, path: string): string {
   // Clean up the path structure
@@ -111,5 +141,5 @@ export function generateToolId(method: string, path: string): string {
 
   const sanitizedPath = sanitizeForToolId(cleanPath)
 
-  return `${method.toUpperCase()}::${sanitizedPath}`
+  return `${replaceDotsForMCP(method.toUpperCase())}::${replaceDotsForMCP(sanitizedPath)}`
 }

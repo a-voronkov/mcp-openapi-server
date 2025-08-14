@@ -280,6 +280,44 @@ npx @ivotoby/openapi-mcp-server --api-base-url https://api.example.com --openapi
 npx @ivotoby/openapi-mcp-server --api-base-url https://api.example.com --openapi-spec https://api.example.com/openapi.json --operation post
 ```
 
+## MCP Compatibility and Dot Handling
+
+### Automatic Dot Replacement for MCP Compatibility
+
+Some MCP clients have issues with dots (`.`) in method names or parameter names. To ensure maximum compatibility, this server automatically replaces dots with `_dot_` in the following contexts:
+
+- **Method names**: Dots in HTTP method names are replaced with `_dot_`
+- **Path segments**: Dots in API path segments are replaced with `_dot_`
+- **Parameter names**: Dots in parameter names are replaced with `_dot_`
+
+**Examples of automatic replacement:**
+
+```
+Original OpenAPI path: /api/v1.2/users
+Generated MCP tool ID: POST::api__v1_dot_2__users
+
+Original parameter name: user.profile
+Normalized parameter name: user_dot_profile
+
+Original path: /user.profile/settings
+Generated MCP tool ID: PUT::user_dot_profile__settings
+```
+
+**Automatic restoration during API calls:**
+
+When making API calls through MCP, the server automatically restores dots from `_dot_`:
+- Tool IDs are parsed and dots are restored in both method names and paths
+- Parameter names are restored to their original form before being sent to the API
+- This ensures that the actual HTTP requests use the correct, original API endpoints
+
+**Why this is necessary:**
+
+- **MCP Protocol Limitations**: Some MCP clients and older MCP implementations don't properly handle dots in method names or parameter names
+- **Backward Compatibility**: Ensures compatibility with MCP clients that predate full dot support
+- **Consistent Behavior**: Provides predictable behavior across different MCP client implementations
+
+**Note**: This automatic replacement is transparent to users - you can continue to use the original OpenAPI specification with dots, and the server will handle the conversion automatically.
+
 ## Transport Types
 
 ### Stdio Transport (Default)

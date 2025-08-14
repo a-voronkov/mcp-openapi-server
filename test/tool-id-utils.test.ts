@@ -1102,3 +1102,85 @@ describe("PR #38 Review Comment Edge Cases", () => {
     })
   })
 })
+
+describe("generateToolId with dots", () => {
+  it("should replace dots in method names with _dot_", () => {
+    const result = generateToolId("GET", "/users")
+    expect(result).toBe("GET::users")
+    
+    const result2 = generateToolId("POST", "/api/v1.2/users")
+    expect(result2).toBe("POST::api__v1_dot_2__users")
+  })
+
+  it("should replace dots in paths with _dot_", () => {
+    const result = generateToolId("GET", "/api/v1.0/users")
+    expect(result).toBe("GET::api__v1_dot_0__users")
+    
+    const result2 = generateToolId("PUT", "/user.profile/settings")
+    expect(result2).toBe("PUT::user_dot_profile__settings")
+  })
+
+  it("should handle multiple dots in paths", () => {
+    const result = generateToolId("POST", "/api/v1.2.3/users")
+    expect(result).toBe("POST::api__v1_dot_2_dot_3__users")
+  })
+
+  it("should handle dots in path parameters", () => {
+    const result = generateToolId("GET", "/users/{user.id}/profile")
+    expect(result).toBe("GET::users__---user_dot_id__profile")
+  })
+})
+
+describe("parseToolId with dots", () => {
+  it("should restore dots from _dot_ in method names", () => {
+    const result = parseToolId("GET::users")
+    expect(result.method).toBe("GET")
+    expect(result.path).toBe("/users")
+    
+    const result2 = parseToolId("POST::api__v1_dot_2__users")
+    expect(result2.method).toBe("POST")
+    expect(result2.path).toBe("/api/v1.2/users")
+  })
+
+  it("should restore dots from _dot_ in paths", () => {
+    const result = parseToolId("GET::api__v1_dot_0__users")
+    expect(result.method).toBe("GET")
+    expect(result.path).toBe("/api/v1.0/users")
+    
+    const result2 = parseToolId("PUT::user_dot_profile__settings")
+    expect(result2.method).toBe("PUT")
+    expect(result2.path).toBe("/user.profile/settings")
+  })
+
+  it("should handle multiple dots in paths", () => {
+    const result = parseToolId("POST::api__v1_dot_2_dot_3__users")
+    expect(result.method).toBe("POST")
+    expect(result.path).toBe("/api/v1.2.3/users")
+  })
+
+  it("should handle dots in path parameters", () => {
+    const result = parseToolId("GET::users__---user_dot_id__profile")
+    expect(result.method).toBe("GET")
+    expect(result.path).toBe("/users/{user.id}/profile")
+  })
+})
+
+describe("round-trip conversion with dots", () => {
+  it("should maintain consistency between generateToolId and parseToolId with dots", () => {
+    const testCases = [
+      { method: "GET", path: "/users" },
+      { method: "POST", path: "/api/v1.2/users" },
+      { method: "PUT", path: "/user.profile/settings" },
+      { method: "DELETE", path: "/api/v1.0.1/resource" },
+      { method: "PATCH", path: "/api/v2.3.4/users/{user.id}/profile" },
+    ]
+
+    for (const testCase of testCases) {
+      const toolId = generateToolId(testCase.method, testCase.path)
+      const parsed = parseToolId(toolId)
+      
+      expect(parsed.method).toBe(testCase.method.toUpperCase())
+      expect(parsed.path).toBe(testCase.path)
+    }
+  })
+})

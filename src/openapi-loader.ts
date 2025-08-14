@@ -483,10 +483,11 @@ export class OpenAPISpecLoader {
 
   /**
    * Normalize parameter names by removing square brackets (e.g., "services_ids[]" -> "services_ids")
+   * and replacing dots with _dot_ for MCP compatibility (e.g., "user.profile" -> "user_dot_profile")
    * This makes JSON Schema more compatible with clients and agents
    */
   private normalizeParameterName(name: string): string {
-    return name.replace(/\[\]$/, '')
+    return name.replace(/\[\]$/, '').replace(/\./g, '_dot_')
   }
 
   /**

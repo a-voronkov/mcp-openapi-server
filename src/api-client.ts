@@ -98,6 +98,24 @@ export class ApiClient {
   }
 
   /**
+   * Restore dots from _dot_ in parameter names for MCP compatibility
+   * This reverses the replacement done during tool creation
+   * 
+   * @param params - Parameters object that may contain _dot_ in keys
+   * @returns Parameters object with _dot_ replaced by dots
+   */
+  private restoreDotsInParameterNames(params: Record<string, any>): Record<string, any> {
+    const restored: Record<string, any> = {}
+    
+    for (const [key, value] of Object.entries(params)) {
+      const restoredKey = key.replace(/_dot_/g, ".")
+      restored[restoredKey] = value
+    }
+    
+    return restored
+  }
+
+  /**
    * Execute an API call based on the tool ID and parameters
    *
    * @param toolId - The tool ID in format METHOD-path-parts
@@ -143,6 +161,10 @@ export class ApiClient {
 
       // Interpolate path parameters into the URL and remove them from params
       const paramsCopy: Record<string, any> = { ...params }
+      
+      // Restore dots in parameter names for MCP compatibility
+      const restoredParams = this.restoreDotsInParameterNames(paramsCopy)
+      
       let resolvedPath = path
 
       // Helper function to escape regex special characters
@@ -153,7 +175,7 @@ export class ApiClient {
       // Handle path parameters
       if (toolDef?.inputSchema?.properties) {
         // Check each parameter to see if it's a path parameter
-        for (const [key, value] of Object.entries(paramsCopy)) {
+        for (const [key, value] of Object.entries(restoredParams)) {
           const paramDef = toolDef.inputSchema.properties[key]
           // Get the parameter location from the extended schema
           const paramDef_any = paramDef as any
@@ -179,13 +201,13 @@ export class ApiClient {
               // Fall back to the original simple replacement for backward compatibility
               resolvedPath = resolvedPath.replace(`/${key}`, `/${encodeURIComponent(value)}`)
             }
-            delete paramsCopy[key]
+            delete restoredParams[key]
           }
         }
       } else {
         // Fallback behavior if tool definition is not available
-        for (const key of Object.keys(paramsCopy)) {
-          const value = paramsCopy[key]
+        for (const key of Object.keys(restoredParams)) {
+          const value = restoredParams[key]
           // Escape key before using it in regex patterns
           const escapedKey = escapeRegExp(key)
           // First try standard OpenAPI, Express-style parameters, and unique markers
@@ -200,12 +222,12 @@ export class ApiClient {
               paramRegex,
               (match) => encodeURIComponent(value) + (match.endsWith("/") ? "/" : ""),
             )
-            delete paramsCopy[key]
+            delete restoredParams[key]
           }
           // Fall back to original simple replacement for backward compatibility
           else if (resolvedPath.includes(`/${key}`)) {
             resolvedPath = resolvedPath.replace(`/${key}`, `/${encodeURIComponent(value)}`)
-            delete paramsCopy[key]
+            delete restoredParams[key]
           }
         }
       }
@@ -225,10 +247,10 @@ export class ApiClient {
       // Handle parameters based on HTTP method
       if (isGetLikeMethod(method)) {
         // For GET-like methods, parameters go in the query string
-        config.params = this.processQueryParams(paramsCopy)
+        config.params = this.processQueryParams(restoredParams)
       } else {
         // For POST-like methods, parameters go in the request body
-        config.data = paramsCopy
+        config.data = restoredParams
       }
 
       // Execute the request
